@@ -1,0 +1,7 @@
+*jar
+pom.xml
+lib
+node_modules
+.shadow-cljs
+.nrepl-*
+.cpcache

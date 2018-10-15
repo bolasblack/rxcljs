@@ -1,0 +1,9 @@
+{:paths ["src"],
+ :deps
+ {org.clojure/core.async {:mvn/version "0.4.474"}
+  c4605.utils {:git/url "https://github.com/bolasblack/c4605.utils"
+               :sha "e7612dec339646a34d057799ec4ae17d6d8771b3"}},
+ :aliases
+ {:dev {:extra-deps {cider/cider-nrepl {:mvn/version "0.18.0"}}}
+  :test {:extra-deps {pjstadig/humane-test-output {:mvn/version "0.8.3"}},
+         :extra-paths ["test"]}}}

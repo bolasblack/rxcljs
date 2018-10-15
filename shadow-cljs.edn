@@ -1,0 +1,14 @@
+{:deps {:aliases [:test]}
+ :source-paths ["src"]
+ :cache-root ".shadow-cljs"
+ :builds {:main {:target :npm-module
+                 :output-dir "lib"
+                 :compiler-options {:source-map true}}
+          :main-dev {:id :main-dev
+                     :target :node-script
+                     :main rxcljs.core-test/-main
+                     :output-to ".shadow-cljs/out/main-dev/index.js"}
+          :main-test {:target :node-test
+                      :output-to "lib/main-test.js"
+                      :autorun true
+                      :compiler-options {:source-map true}}}}
