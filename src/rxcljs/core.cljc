@@ -5,7 +5,7 @@
   (:require
    [clojure.core.async.impl.protocols]
    [clojure.core.async :as async :refer [close!]]
-   [utils.core :as uc :include-macros true])
+   [adjutant.core :as ac :include-macros true])
   #?(:clj (:import [clojure.lang IDeref])))
 
 (defprotocol RxCljsChanValue
@@ -55,7 +55,7 @@
      ([bindings val-handler err-handler]
       `(handle-rxval ~bindings ~val-handler ~err-handler nil))
      ([bindings val-handler err-handler else-handler]
-      (uc/assert-args
+      (ac/assert-args
        (vector? bindings) "a vector for its binding"
        (= 2 (count bindings)) "exactly 2 forms in binding vector")
       (let [[v-sym] bindings
@@ -68,7 +68,7 @@
              :else ~else-cause))))))
 
 #_(macroexpand '(handle-rxval
-                 [eval-expr (uc/if-cljs
+                 [eval-expr (ac/if-cljs
                              (cljs.core.async/<! ~ch)
                              (clojure.core.async/<! ~ch))]
                  (deref eval-expr)
@@ -82,9 +82,9 @@
      (let [wrapped-body
            `(try
               (rxval (do ~@body))
-              (catch (uc/if-cljs :default Throwable) e#
+              (catch (ac/if-cljs :default Throwable) e#
                 (rxerror e#)))]
-       `(uc/if-cljs
+       `(ac/if-cljs
          (cljs.core.async/go ~wrapped-body)
          (clojure.core.async/go ~wrapped-body)))))
 
@@ -99,7 +99,7 @@
 #?(:clj
    (defmacro <! [ch]
      `(handle-rxval
-       [eval-expr# (uc/if-cljs
+       [eval-expr# (ac/if-cljs
                     (cljs.core.async/<! ~ch)
                     (clojure.core.async/<! ~ch))]
        @eval-expr#
@@ -109,7 +109,7 @@
 
 #?(:clj
    (defmacro >! [& args]
-     `(uc/if-cljs
+     `(ac/if-cljs
        (cljs.core.async/>! ~@args)
        (clojure.core.async/>! ~@args))))
 

@@ -8,7 +8,7 @@
    [goog.object :as go]
    [cljs.test :as ct :refer-macros [deftest testing is] :include-macros true]
    [cljs.core.async :as async]
-   [utils.core :as uc :include-macros true]
+   [adjutant.core :as ac :include-macros true]
    [rxcljs.core :as rc :refer [RxNext RxError] :include-macros true]
    [rxcljs.transformers :as rt]))
 
@@ -185,7 +185,7 @@ callback(null, {
 
       _
       (do
-        (is (uc/error? resp))
+        (is (ac/error? resp))
         (is (= fake-error resp)))]
      (done))))
 
