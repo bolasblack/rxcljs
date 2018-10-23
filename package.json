@@ -1,7 +1,6 @@
 {
   "scripts": {
-    "dev": "shadow-cljs -A:dev server",
-    "test": "shadow-cljs -A:dev watch main-test"
+    "dev": "shadow-cljs watch main main-dev main-test"
   },
   "devDependencies": {
     "lodash.isequal": "^4.5.0",

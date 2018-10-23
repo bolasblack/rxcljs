@@ -125,27 +125,3 @@
 (deftest chan?
   (is (not (rc/chan? [])))
   (is (rc/chan? (async/chan))))
-
-
-
-
-(deftest flat-chan
-  (ct/async
-   done
-   (rc/go-let [fake-error (js/Error. "flat-chan error")
-               chan1 (go (go (go 1)))
-               chan2 (go 1)
-               chan3 1
-               chan4 (go (go (throw fake-error)))
-               chan5 (go (go fake-error))]
-     (is (= (rc/rxnext 1) (async/<! (rc/flat-chan chan1))))
-     (is (= (rc/rxnext 1) (async/<! (rc/flat-chan chan2))))
-     (is (= (rc/rxnext 1) (async/<! (rc/flat-chan chan3))))
-     (is (= (rc/rxerror fake-error) (async/<! (rc/flat-chan chan4))))
-     (is (= (rc/rxnext fake-error) (async/<! (rc/flat-chan chan5))))
-     (done))))
-
-(deftest <<!
-  (let [res (macroexpand-1 '(rc/<<! chan))]
-    (is (= '(rxcljs.core/<! (rxcljs.core/flat-chan chan))
-           res))))

@@ -3,7 +3,8 @@
   #?(:cljs (:require-macros
             [rxcljs.core :refer [go go-loop go-let handle-rxval >! <! <<!]]))
   (:require
-   [clojure.core.async.impl.protocols]
+   [clojure.core.async.impl.protocols :as async-protocols]
+   [clojure.core.async.impl.buffers :as async-buffers]
    [clojure.core.async :as async :refer [close!]]
    [adjutant.core :as ac :include-macros true])
   #?(:clj (:import [clojure.lang IDeref])))
@@ -117,7 +118,7 @@
 
 
 (defn chan? [a]
-  (satisfies? clojure.core.async.impl.protocols/ReadPort a))
+  (satisfies? async-protocols/ReadPort a))
 
 
 

@@ -1,6 +1,6 @@
 (ns rxcljs.transformers
   #?(:cljs (:require-macros
-            [rxcljs.core :refer [go <! handle-rxval]]
+            [rxcljs.core :refer [go go-loop <! handle-rxval]]
             [rxcljs.transformers :refer [<p! <o! denodify..]]))
   (:require
    [clojure.core.async :as async :refer [close!]]
@@ -8,10 +8,12 @@
    #?@(:cljs [[goog.object :as go]
               ["util" :refer [promisify]]
               [rxcljs.core :as rc]]
-       :clj [[rxcljs.core :as rc :refer [<!]]])))
+       :clj [[rxcljs.core :as rc :refer [go go-loop <!]]])))
 
 #?(:cljs
-   (defn promise? [obj]
+   (defn promise?
+     "Check obj is `js/Promise` instance"
+     [obj]
      (and obj (fn? (.-then obj)))))
 
 #?(:cljs
@@ -175,3 +177,24 @@
 
           :else
           `((denodify (.. ~o ~@path) (.. ~o ~@(butlast path))) ~@args))))))
+
+
+
+
+(defn flat-chan
+  "Flat nested chan to a value.
+
+  ```clojurescript
+  (is (= 1 (<! (flat-chan (go (go (go 1)))))))
+  ```"
+  [ch]
+  (go-loop [c ch]
+    (if (rc/chan? c)
+      (recur (<! c))
+      c)))
+
+#?(:clj
+   (defmacro <<!
+     "Shortcut for (<! (flat-chan chan))"
+     [ch]
+     `(<! (flat-chan ~ch))))

@@ -222,3 +222,27 @@ callback(null, {
           resp2 (<! (rt/denodify.. obj -a -b "test path"))
           _ (is (= {:path "test path" :this-bounded? true} resp2))]
          (done))))))
+
+
+
+
+(deftest flat-chan
+  (ct/async
+   done
+   (rc/go-let [fake-error (js/Error. "flat-chan error")
+               chan1 (go (go (go 1)))
+               chan2 (go 1)
+               chan3 1
+               chan4 (go (go (throw fake-error)))
+               chan5 (go (go fake-error))]
+     (is (= (rc/rxnext 1) (async/<! (rt/flat-chan chan1))))
+     (is (= (rc/rxnext 1) (async/<! (rt/flat-chan chan2))))
+     (is (= (rc/rxnext 1) (async/<! (rt/flat-chan chan3))))
+     (is (= (rc/rxerror fake-error) (async/<! (rt/flat-chan chan4))))
+     (is (= (rc/rxnext fake-error) (async/<! (rt/flat-chan chan5))))
+     (done))))
+
+(deftest <<!
+  (let [res (macroexpand-1 '(rt/<<! chan))]
+    (is (= '(rxcljs.core/<! (rxcljs.transformers/flat-chan chan))
+           res))))
