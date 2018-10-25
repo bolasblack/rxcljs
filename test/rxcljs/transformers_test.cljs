@@ -133,95 +133,116 @@
 
 
 
-(deftest denodify
-  (ct/async
-   done
-   (go-let
-     [fake-read-file1
-      (rt/denodify
-       (js* "function readFile(path, options, callback) {
+#_(deftest denodify
+    (ct/async
+     done
+     (go-let
+       [fake-read-file1
+        (rt/denodify
+         (js* "function readFile(path, options, callback) {
 const keys = Object.keys(this)
 callback(null, {
   path: path,
   options: options,
   'this-bounded?': keys.length === 1 && keys[0] === 'bounded' && this.bounded,
 })}")
-       #js {:bounded true})
+         #js {:bounded true})
 
-      _
-      (do
-        (is (= "denodified_readFile" (.-name fake-read-file1)))
-        (is (= 2 (.-length fake-read-file1))))
+        _
+        (do
+          (is (= "denodified_readFile" (.-name fake-read-file1)))
+          (is (= 2 (.-length fake-read-file1))))
 
-      resp
-      (js->clj (<! (fake-read-file1 "/file/path.text" nil))
-               :keywordize-keys true)
+        resp
+        (js->clj (<! (fake-read-file1 "/file/path.text" nil))
+                 :keywordize-keys true)
 
-      _
-      (do
-        (is (map? resp))
-        (is (= {:path "/file/path.text"
-                :options nil
-                :this-bounded? true}
-               resp)))
+        _
+        (do
+          (is (map? resp))
+          (is (= {:path "/file/path.text"
+                  :options nil
+                  :this-bounded? true}
+                 resp)))
 
-      fake-error
-      (js/Error. "test error")
+        fake-error
+        (js/Error. "test error")
 
-      fake-read-file2
-      (rt/denodify (fn [path options callback] (callback fake-error)))
+        fake-read-file2
+        (rt/denodify (fn [path options callback] (callback fake-error)))
 
-      _
-      (do
-        (is (= "denodified_fn" (.-name fake-read-file2)))
-        (is (= 2 (.-length fake-read-file2))))
+        _
+        (do
+          (is (= "denodified_fn" (.-name fake-read-file2)))
+          (is (= 2 (.-length fake-read-file2))))
 
-      resp
-      (try
-        (<! (fake-read-file2 "/file/path.text" nil))
-        (is false)
-        (catch :default err
-          err))
+        resp
+        (try
+          (<! (fake-read-file2 "/file/path.text" nil))
+          (is false)
+          (catch :default err
+            err))
 
-      _
-      (do
-        (is (ac/error? resp))
-        (is (= fake-error resp)))]
-     (done))))
+        _
+        (do
+          (is (ac/error? resp))
+          (is (= fake-error resp)))]
+       (done))))
 
-(deftest denodify..
-  (ct/async
-   done
-   (do
-     (is (= (macroexpand-1 '(rt/denodify.. js/fs.readFile))
-            '((rxcljs.transformers/denodify js/fs.readFile))))
-     (is (= (macroexpand-1 '(rt/denodify.. js/fs.readFile "foo"))
-            '((rxcljs.transformers/denodify js/fs.readFile) "foo")))
+#_(deftest denodify..
+    (ct/async
+     done
+     (do
+       (is (= (macroexpand-1 '(rt/denodify.. js/fs.readFile))
+              '((rxcljs.transformers/denodify js/fs.readFile))))
+       (is (= (macroexpand-1 '(rt/denodify.. js/fs.readFile "foo"))
+              '((rxcljs.transformers/denodify js/fs.readFile) "foo")))
 
-     (is (= (macroexpand-1 '(rt/denodify.. ctx -a))
-            '((rxcljs.transformers/denodify (.. ctx -a) ctx))))
-     (is (= (macroexpand-1 '(rt/denodify.. ctx -a "foo"))
-            '((rxcljs.transformers/denodify (.. ctx -a) ctx) "foo")))
+       (is (= (macroexpand-1 '(rt/denodify.. ctx -a))
+              '((rxcljs.transformers/denodify (.. ctx -a) ctx))))
+       (is (= (macroexpand-1 '(rt/denodify.. ctx -a "foo"))
+              '((rxcljs.transformers/denodify (.. ctx -a) ctx) "foo")))
 
-     (is (= (macroexpand-1 '(rt/denodify.. ctx -a -b -c))
-            '((rxcljs.transformers/denodify (.. ctx -a -b -c) (.. ctx -a -b)))))
-     (is (= (macroexpand-1 '(rt/denodify.. ctx -a -b -c "foo"))
-            '((rxcljs.transformers/denodify (.. ctx -a -b -c) (.. ctx -a -b)) "foo")))
+       (is (= (macroexpand-1 '(rt/denodify.. ctx -a -b -c))
+              '((rxcljs.transformers/denodify (.. ctx -a -b -c) (.. ctx -a -b)))))
+       (is (= (macroexpand-1 '(rt/denodify.. ctx -a -b -c "foo"))
+              '((rxcljs.transformers/denodify (.. ctx -a -b -c) (.. ctx -a -b)) "foo")))
 
+       (let [obj #js{:a #js{:b nil}}]
+         (set! (.-b (.-a obj))
+               (fn [path callback]
+                 (callback nil {:path path
+                                :this-bounded? (= (js* "this") (.-a obj))})))
+         (go-let
+           [resp1 (<! (rt/denodify..
+                       (fn [path callback]
+                         (callback nil {:path path}))
+                       "test path"))
+            _ (is (= {:path "test path"} resp1))
+            resp2 (<! (rt/denodify.. obj -a -b "test path"))
+            _ (is (= {:path "test path" :this-bounded? true} resp2))]
+           (done))))))
+
+#_(deftest <n!
+    (ct/async
+     done
+     (is (= '(rxcljs.core/<! (rxcljs.transformers/denodify.. ctx))
+            (macroexpand-1 '(rt/<n! ctx))))
+     (is (= '(rxcljs.core/<! (rxcljs.transformers/denodify.. ctx -a "foo"))
+            (macroexpand-1 '(rt/<n! ctx -a "foo"))))
      (let [obj #js{:a #js{:b nil}}]
        (set! (.-b (.-a obj))
              (fn [path callback]
                (callback nil {:path path
                               :this-bounded? (= (js* "this") (.-a obj))})))
        (go-let
-         [resp1 (<! (rt/denodify..
-                     (fn [path callback]
-                       (callback nil {:path path}))
-                     "test path"))
+         [resp1 (rt/<n! (fn [path callback]
+                          (callback nil {:path path}))
+                        "test path")
           _ (is (= {:path "test path"} resp1))
-          resp2 (<! (rt/denodify.. obj -a -b "test path"))
+          resp2 (rt/<n! obj -a -b "test path")
           _ (is (= {:path "test path" :this-bounded? true} resp2))]
-         (done))))))
+         (done)))))
 
 
 

@@ -6,7 +6,6 @@
    [clojure.core.async :as async :refer [close!]]
    [clojure.string :as s]
    #?@(:cljs [[goog.object :as go]
-              ["util" :refer [promisify]]
               [rxcljs.core :as rc]]
        :clj [[rxcljs.core :as rc :refer [go go-loop <!]]])))
 
@@ -102,21 +101,16 @@
   argument and calling that callback with error as the first
   argument and success value on the second argument.
 
-  If the `nodeFunction` calls its callback with multiple success
-  values, the fulfillment value will be an array of them.
-
   If you pass a `receiver`, the `nodeFunction` will be called as a
   method on the `receiver`.
-
-  Example of promisifying the asynchronous `readFile` of node.js `fs`-module:
 
   ```clojurescript
   (def read-file (denodify (.-readFile fs)))
 
   (go (try
-        (let [content (<? (read-file \"myfile\" \"utf8\") :failure? first)]
+        (let [content (<? (read-file \"myfile\" \"utf8\"))]
           (println \"The result of evaluating myfile.js\" (.toString content)))
-        (catch js/Error err
+        (catch :default err
           (prn 'Error reading file' err))))
   ```
 
@@ -127,28 +121,24 @@
   (def redis-get (denodify (.-get redisClient) redisClient))
 
   (go (<! (redis-get \"foo\")))
-  ```
-  "
+  ```"
      ([f]
       (denodify f nil))
      ([f receiver]
-      (let [promisify-fn (promisify f)
-            denodified-fn (fn denodified-fn [& args]
-                            (promise->chan (.apply promisify-fn receiver (apply array args))))]
+      (letfn [(denodified-fn [& args]
+                (let [chan (async/chan)
+                      close-chan #(close! chan)
+                      callback (fn [err data]
+                                 (if err
+                                   (async/put! chan (rc/rxerror err) close-chan)
+                                   (async/put! chan (rc/rxnext data) close-chan)))
+                      final-args (concat args [callback])]
+                  (.apply f receiver (into-array final-args))
+                  chan))]
         (try
-          (js/Object.defineProperty
-           denodified-fn
-           "length"
-           #js {:configurable true :value (if (zero? (.-length promisify-fn))
-                                            0
-                                            (dec (.-length promisify-fn)))})
-          (let [new-name (if (s/blank? (.-name f))
-                           "denodified_fn"
-                           (str "denodified_" (.-name f)))]
-            (js/Object.defineProperty
-             denodified-fn
-             "name"
-             #js {:configurable true :value new-name}))
+          (js/Object.defineProperty denodified-fn "length" #js {:configurable true :value (dec f.length)})
+          (let [new-name (if (s/blank? (.-name f)) "denodified_fn" (str "denodified_" (.-name f)))]
+            (js/Object.defineProperty denodified-fn "name" #js {:configurable true :value new-name}))
           (catch :default err
             (js/console.error err)))
         denodified-fn))))
@@ -156,11 +146,9 @@
 #?(:clj
    (defmacro denodify..
      "```clojurescript
-  (go (<! (denodify.. fs.readFile \"foo\")))
   (macroexpand-1 '(denodify.. fs.readFile \"foo\"))
   #=> ((denodify fs.readFile) \"foo\")
 
-  (go (<! (denodify.. redisClient -get \"foo\")))
   (macroexpand-1 '(denodify.. redisClient -get \"foo\"))
   #=> ((denodify (.. redisClient -get) redisClient) \"foo\")
   ```"
@@ -177,6 +165,15 @@
 
           :else
           `((denodify (.. ~o ~@path) (.. ~o ~@(butlast path))) ~@args))))))
+
+#?(:clj
+   (defmacro <n!
+     "```clojurescript
+  (macroexpand-1 '(<n! redisClient -get \"foo\"))
+  #=> (<! (denodify.. redisClient -get \"foo\"))
+  ```"
+     [o & path]
+     `(<! (denodify.. ~o ~@path))))
 
 
 
