@@ -1,13 +1,15 @@
 (ns rxcljs.core
   (:refer-clojure :exclude [update])
   #?(:cljs (:require-macros
-            [rxcljs.core :refer [go go-loop go-let handle-rxval >! <! <<!]]))
+            [rxcljs.core :refer [go go-loop go-let handle-rxval >! <!]]))
   (:require
+   #?(:cljs [clojure.core.async.impl.buffers :refer [FixedBuffer DroppingBuffer SlidingBuffer]])
    [clojure.core.async.impl.protocols :as async-protocols]
-   [clojure.core.async.impl.buffers :as async-buffers]
    [clojure.core.async :as async :refer [close!]]
    [adjutant.core :as ac :include-macros true])
-  #?(:clj (:import [clojure.lang IDeref])))
+  #?(:clj (:import [clojure.lang IDeref]
+                   [clojure.core.async.impl.buffers FixedBuffer DroppingBuffer SlidingBuffer])))
+
 
 (defprotocol RxCljsChanValue
   (update [self f]))
@@ -123,12 +125,16 @@
 
 
 
-(defn flat-chan [ch]
-  (go-loop [c ch]
-    (if (chan? c)
-      (recur (<! c))
-      c)))
+(defn clone-buf [buf]
+  (cond
+    (instance? FixedBuffer buf)
+    (async/buffer (.-n buf))
 
-#?(:clj
-   (defmacro <<! [ch]
-     `(<! (flat-chan ~ch))))
+    (instance? DroppingBuffer buf)
+    (async/dropping-buffer (.-n buf))
+
+    (instance? SlidingBuffer buf)
+    (async/sliding-buffer (.-n buf))
+
+    :else
+    (ac/error! "Unsupported buffer type")))

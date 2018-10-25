@@ -5,6 +5,7 @@
    [pjstadig.humane-test-output]
    [cljs.test :as ct :refer-macros [deftest testing is] :include-macros true]
    [cljs.core.async :as async]
+   [cljs.core.async.impl.buffers :as asyncb]
    [rxcljs.core :as rc :refer [RxNext RxError] :include-macros true]))
 
 (defn -main [])
@@ -125,3 +126,28 @@
 (deftest chan?
   (is (not (rc/chan? [])))
   (is (rc/chan? (async/chan))))
+
+
+
+
+(deftest clone-buf
+  (let [bufs [(async/buffer 10)
+              (async/dropping-buffer 18)
+              (async/sliding-buffer 9)]
+        [buf1 buf2 buf3] (map rc/clone-buf bufs)]
+
+    (is (instance? asyncb/FixedBuffer buf1))
+    (is (= 10 (.-n buf1)))
+
+    (is (instance? asyncb/DroppingBuffer buf2))
+    (is (= 18 (.-n buf2)))
+
+    (is (instance? asyncb/SlidingBuffer buf3))
+    (is (= 9 (.-n buf3)))
+
+    (try
+      (rc/clone-buf [])
+      (is false)
+      (catch :default err
+        (is (instance? js/Error err))
+        (is (= "Unsupported buffer type" err.message))))))

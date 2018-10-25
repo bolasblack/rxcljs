@@ -1,7 +1,7 @@
 (ns rxcljs.transformers
   #?(:cljs (:require-macros
-            [rxcljs.core :refer [go go-loop <! handle-rxval]]
-            [rxcljs.transformers :refer [<p! <o! denodify..]]))
+            [rxcljs.core :refer [go go-loop <! >! handle-rxval]]
+            [rxcljs.transformers :refer [<<! <o! <p! <n! denodify..]]))
   (:require
    [clojure.core.async :as async :refer [close!]]
    [clojure.string :as s]
