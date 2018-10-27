@@ -1,4 +1,4 @@
-{:deps {:aliases [:test]}
+{:deps {:aliases [:dev :test]}
  :source-paths ["src"]
  :cache-root ".shadow-cljs"
  :builds {:main {:target :npm-module

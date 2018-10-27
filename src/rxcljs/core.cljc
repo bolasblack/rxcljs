@@ -125,6 +125,14 @@
 
 
 
+(defn closed? [a]
+  (if (chan? a)
+    (async-protocols/closed? a)
+    true))
+
+
+
+
 (defn clone-buf [buf]
   (cond
     (instance? FixedBuffer buf)

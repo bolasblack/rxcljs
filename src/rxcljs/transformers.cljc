@@ -1,6 +1,6 @@
 (ns rxcljs.transformers
   #?(:cljs (:require-macros
-            [rxcljs.core :refer [go go-loop <! >! handle-rxval]]
+            [rxcljs.core :refer [go go-loop <! handle-rxval]]
             [rxcljs.transformers :refer [<<! <o! <p! <n! denodify..]]))
   (:require
    [clojure.core.async :as async :refer [close!]]
@@ -152,19 +152,21 @@
   (macroexpand-1 '(denodify.. redisClient -get \"foo\"))
   #=> ((denodify (.. redisClient -get) redisClient) \"foo\")
   ```"
-     ([o & _path]
-      (let [[path args] (split-with #(and (symbol? %)
-                                          (s/starts-with? (name %) "-"))
-                                    _path)]
-        (cond
-          (empty? path)
-          `((denodify ~o) ~@args)
+     [o & _path]
+     (let [[path args] (split-with #(and (symbol? %)
+                                         (s/starts-with? (name %) "-"))
+                                   _path)]
+       (cond
+         (empty? path)
+         `((denodify ~o) ~@args)
 
-          (= 1 (count path))
-          `((denodify (.. ~o ~@path) ~o) ~@args)
+         (= 1 (count path))
+         `((denodify (.. ~o ~@path) ~o) ~@args)
 
-          :else
-          `((denodify (.. ~o ~@path) (.. ~o ~@(butlast path))) ~@args))))))
+         :else
+         `((denodify (.. ~o ~@path) (.. ~o ~@(butlast path))) ~@args)))))
+
+#_(macroexpand-1 '(denodify.. obj -a -b "test path"))
 
 #?(:clj
    (defmacro <n!
@@ -172,8 +174,10 @@
   (macroexpand-1 '(<n! redisClient -get \"foo\"))
   #=> (<! (denodify.. redisClient -get \"foo\"))
   ```"
-     [o & path]
-     `(<! (denodify.. ~o ~@path))))
+     [& path]
+     `(<! (rxcljs.transformers/denodify.. ~@path))))
+
+#_(macroexpand-1 '(<n! obj -a -b "test path"))
 
 
 
@@ -183,6 +187,7 @@
 
   ```clojurescript
   (is (= 1 (<! (flat-chan (go (go (go 1)))))))
+  (is (= 1 (<! (flat-chan 1))))
   ```"
   [ch]
   (go-loop [c ch]

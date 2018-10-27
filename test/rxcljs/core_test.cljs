@@ -130,6 +130,14 @@
 
 
 
+(deftest closed?
+  (is (rc/closed? []))
+  (is (not (rc/closed? (async/chan))))
+  (is (rc/closed? (async/close! (async/chan)))))
+
+
+
+
 (deftest clone-buf
   (let [bufs [(async/buffer 10)
               (async/dropping-buffer 18)
