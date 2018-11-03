@@ -118,6 +118,31 @@
 
 
 
+(defn- safely-unwrap-rxval [v]
+  (cond
+    (not (rxval? v)) v
+    (rxnext? v) @v
+    :else nil))
+
+(defn take!
+  ([port fn1] (take! port fn1 true))
+  ([port fn1 on-caller?]
+   (async/take!
+    port
+    #(fn1 (safely-unwrap-rxval %))
+    on-caller?)))
+
+(def put! "Alias of clojure.core.async/put!" async/put!)
+
+(defn poll!
+  "Like clojure.core.async/poll!, but support RxNext/RxError"
+  [port]
+  (safely-unwrap-rxval (async/poll! port)))
+
+(def offer! "Alias of clojure.core.async/offer!" async/offer!)
+
+
+
 
 (defn chan? [a]
   (satisfies? async-protocols/ReadPort a))
