@@ -8,7 +8,8 @@
    #?@(:clj [[adjutant.core :refer [def-]]
              [rxcljs.core :as rc :refer [go go-let go-loop <! >!]]
              [rxcljs.transformers :refer [<<!]]]
-       :cljs [[rxcljs.core :as rc]])))
+       :cljs [[rxcljs.core :as rc]
+              [rxcljs.transformers]])))
 
 (defn xfwrap
   "wrap/unwrap RxNext and RxError for transducers automatically
