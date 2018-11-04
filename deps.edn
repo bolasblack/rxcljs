@@ -2,7 +2,7 @@
  :deps
  {org.clojure/core.async {:mvn/version "0.4.474"}
   adjutant {:git/url "https://github.com/bolasblack/adjutant"
-            :sha "89d03e4ea491482053af4e05d98bc462d84e7d20"}}
+            :sha "4fd6015251143fc09732adfd2d8e48c0269220ab"}}
  :aliases
  {:dev {:extra-deps {cider/cider-nrepl {:mvn/version "0.18.0"}}}
   :test {:extra-deps {pjstadig/humane-test-output {:mvn/version "0.8.3"}},
