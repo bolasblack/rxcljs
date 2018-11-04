@@ -5,7 +5,7 @@
   (:require
    #?(:cljs [clojure.core.async.impl.buffers :refer [FixedBuffer DroppingBuffer SlidingBuffer]])
    [clojure.core.async.impl.protocols :as async-protocols]
-   [clojure.core.async :as async :refer [close!]]
+   [clojure.core.async :as async]
    [adjutant.core :as ac :include-macros true])
   #?(:clj (:import [clojure.lang IDeref]
                    [clojure.core.async.impl.buffers FixedBuffer DroppingBuffer SlidingBuffer])))
@@ -47,6 +47,18 @@
 
 (defn rxval [a]
   (if (rxval? a) a (rxnext a)))
+
+(defn safely-unwrap-rxval
+  "Safely unwrap any value
+
+  * if v is RxNext, unwrap it
+  * if v is RxError, return nil
+  * else, return nil"
+  [v]
+  (cond
+    (not (rxval? v)) v
+    (rxnext? v) @v
+    :else nil))
 
 
 
@@ -118,13 +130,9 @@
 
 
 
-(defn- safely-unwrap-rxval [v]
-  (cond
-    (not (rxval? v)) v
-    (rxnext? v) @v
-    :else nil))
 
 (defn take!
+  "Like clojure.core.async/take!, but support RxNext/RxError"
   ([port fn1] (take! port fn1 true))
   ([port fn1 on-caller?]
    (async/take!
@@ -140,6 +148,8 @@
   (safely-unwrap-rxval (async/poll! port)))
 
 (def offer! "Alias of clojure.core.async/offer!" async/offer!)
+
+(def close! "Alias of clojure.core.async/close!" async/close!)
 
 
 

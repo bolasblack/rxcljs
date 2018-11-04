@@ -1,11 +1,12 @@
 (ns rxcljs.operators
+  (:refer-clojure :exclude [map])
   #?(:cljs (:require-macros
-            [adjutant.core :refer [def-]]
+            [adjutant.core :refer [if-cljs def-]]
             [rxcljs.core :refer [go go-let go-loop <! >!]]
             [rxcljs.transformers :refer [<<!]]))
   (:require
-   [clojure.core.async :as async]
-   #?@(:clj [[adjutant.core :refer [def-]]
+   [clojure.core.async :as async :include-macros true]
+   #?@(:clj [[adjutant.core :refer [if-cljs def-]]
              [rxcljs.core :as rc :refer [go go-let go-loop <! >!]]
              [rxcljs.transformers :refer [<<!]]]
        :cljs [[rxcljs.core :as rc]
@@ -31,7 +32,7 @@
                 (@reducer-ref result (rc/rxerror e))))))))
      (fn [rf]
        (vreset! reducer-ref rf)
-       ((map rc/rxnext) rf))]))
+       ((clojure.core/map rc/rxnext) rf))]))
 
 (defn xfcomp
   "Drop-in replacement for comp, wrap/unwrap RxNext and RxError for transducers automatically"
@@ -88,3 +89,51 @@
         (<! task))
       (async/close! dst-chan))
     dst-chan))
+
+;; from
+;; https://github.com/clojure/core.async/blob/83ca922f618fb8b1a3affe7ab8b6b62b80e083e8/src/main/clojure/cljs/core/async.cljs#L680
+;; https://github.com/clojure/core.async/blob/83ca922f618fb8b1a3affe7ab8b6b62b80e083e8/src/main/clojure/clojure/core/async.clj#L918
+(defn map
+  "Like core.async/map, but support RxNext/RxError, and auto flat channels"
+  ([f chs] (map f chs nil))
+  ([f chs buf-or-n]
+   (let [chs (vec chs)
+         out (async/chan buf-or-n)
+         cnt (count chs)
+         rets (object-array cnt)
+         dchan (async/chan 1)
+         dctr (atom nil)
+         done (mapv (fn [i]
+                      (fn [err ret]
+                        (aset rets i (cond
+                                       err (rc/rxerror err)
+                                       (nil? ret) ret
+                                       :else (rc/rxnext ret)))
+                        (when (zero? (swap! dctr dec))
+                          (rc/put!
+                           dchan
+                           (if-cljs
+                            (.slice rets 0)
+                            (java.util.Arrays/copyOf rets cnt))))))
+                    (range cnt))]
+     (go-loop []
+       (reset! dctr cnt)
+       (dotimes [i cnt]
+         (try
+           (async/take! (chs i) #(if (rc/rxerror? %)
+                                   ((done i) (deref %))
+                                   ((done i) nil (rc/safely-unwrap-rxval %))))
+           (catch :default e
+             ((done i) e))))
+       (let [rets (<! dchan)]
+         (cond
+           (some rc/rxerror? rets)
+           (do (async/>! out (first (filter rc/rxerror? rets)))
+               (rc/close! out))
+           
+           (some nil? rets)
+           (rc/close! out)
+           
+           :else (do (>! out (apply f (.map rets deref)))
+                     (recur)))))
+     out)))

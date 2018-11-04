@@ -156,3 +156,67 @@
      (is (identical? fake-error2 @r5))
 
      (done))))
+
+
+
+
+(defn- close-to? [expected actual &
+                  {:keys [deviate]
+                   :or {deviate 100}}]
+  (some #(= actual %)
+        (range (- expected deviate)
+               (+ expected deviate))))
+
+(defn- create-chan [duration & args]
+  (let [chan (async/chan)]
+    (go (async/<! (async/timeout duration))
+        (>! chan (into [1] args))
+        (async/<! (async/timeout duration))
+        (>! chan (into [2] args))
+        (async/<! (async/timeout duration))
+        (>! chan (into [3] args))
+        (async/close! chan))
+    chan))
+
+(deftest test-map
+  (ct/async
+   done
+   (go-let
+     [start (js/Date.now)
+      chan (ro/map
+            #(conj %& (- (js/Date.now) start))
+            [(create-chan 100 :a1 :a2)
+             (create-chan 200 :b1 :b2)])
+
+      d1 (<! chan)
+      _ (is (close-to? 200 (first d1)))
+      _ (is (= (next d1)
+               '([1 :a1 :a2]
+                 [1 :b1 :b2])))
+
+      d2 (<! chan)
+      _ (is (close-to? 400 (first d2)))
+      _ (is (= (next d2)
+               '([2 :a1 :a2]
+                 [2 :b1 :b2])))
+
+      d3 (<! chan)
+      _ (is (close-to? 600 (first d3)))
+      _ (is (= (next d3)
+               '([3 :a1 :a2]
+                 [3 :b1 :b2])))]
+
+     (done))))
+
+(deftest test-map-error-handle
+  (ct/async
+   done
+   (go-let [fake-error (js/Error. "fake error")]
+     (is (= [[1 2] (rc/rxerror fake-error)]
+            (<! (async/into
+                 []
+                 (ro/map
+                  vector
+                  [(async/to-chan [(rc/rxnext 1) (rc/rxerror fake-error) (rc/rxnext 4)])
+                   (async/to-chan [(rc/rxnext 2) (rc/rxnext 3) (rc/rxnext 5)])])))))
+     (done))))
