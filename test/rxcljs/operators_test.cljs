@@ -111,7 +111,7 @@
      (is (= 1 (async/poll! dst-chan)) "1st poll! dst-chan step 6")
      (is (nil? (async/poll! dst-chan)) "2nd poll! dst-chan step 6")
      (is (rc/closed? dst-chan) "check dst-chan closed step 6")
-     
+
      (done))))
 
 (deftest concurrency-with-error
@@ -194,6 +194,21 @@
                '([3 :a1 :a2]
                  [3 :b1 :b2])))]
 
+     (done))))
+
+(deftest test-map-returns-channel
+  (ct/async
+   done
+   (go-let []
+     (is (= [[1 2] 8 [6 7]]
+            (<! (async/into
+                 []
+                 (ro/map
+                  #(if (= 4 %2)
+                     (async/to-chan [8 9])
+                     (vector %1 %2))
+                  [(async/to-chan [1 3 6])
+                   (async/to-chan [2 4 7])])))))
      (done))))
 
 (deftest test-map-error-handle
