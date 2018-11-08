@@ -14,14 +14,6 @@
 (defprotocol RxCljsChanValue
   (update [self f]))
 
-(defrecord RxNext [value]
-  RxCljsChanValue
-  (update [self f]
-    (RxNext. (f (:value self))))
-  IDeref
-  #?(:cljs (-deref [record] (:value record))
-     :clj (deref [record] (:value record))))
-
 (defrecord RxError [error]
   RxCljsChanValue
   (update [self f]
@@ -29,12 +21,6 @@
   IDeref
   #?(:cljs (-deref [record] (:error record))
      :clj (deref [record] (:error record))))
-
-(defn rxnext? [a]
-  (instance? RxNext a))
-
-(defn rxnext [a]
-  (if (rxnext? a) a (RxNext. a)))
 
 (defn rxerror? [a]
   (instance? RxError a))
@@ -45,20 +31,13 @@
 (defn rxval? [a]
   (satisfies? RxCljsChanValue a))
 
-(defn rxval [a]
-  (if (rxval? a) a (rxnext a)))
-
 (defn safely-unwrap-rxval
   "Safely unwrap any value
 
-  * if v is RxNext, unwrap it
   * if v is RxError, return nil
-  * else, return nil"
+  * else, return v"
   [v]
-  (cond
-    (not (rxval? v)) v
-    (rxnext? v) @v
-    :else nil))
+  (if (rxerror? v) nil v))
 
 
 
@@ -96,7 +75,7 @@
    (defmacro go [& body]
      (let [wrapped-body
            `(try
-              (rxval (do ~@body))
+              ~@body
               (catch (ac/if-cljs :default Throwable) e#
                 (rxerror e#)))]
        `(ac/if-cljs
@@ -132,7 +111,7 @@
 
 
 (defn take!
-  "Like clojure.core.async/take!, but support RxNext/RxError"
+  "Like clojure.core.async/take!, but support RxError"
   ([port fn1] (take! port fn1 true))
   ([port fn1 on-caller?]
    (async/take!
@@ -143,7 +122,7 @@
 (def put! "Alias of clojure.core.async/put!" async/put!)
 
 (defn poll!
-  "Like clojure.core.async/poll!, but support RxNext/RxError"
+  "Like clojure.core.async/poll!, but support RxError"
   [port]
   (safely-unwrap-rxval (async/poll! port)))
 

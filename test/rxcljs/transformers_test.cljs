@@ -9,7 +9,7 @@
    [cljs.test :as ct :refer-macros [deftest testing is] :include-macros true]
    [cljs.core.async :as async]
    [adjutant.core :as ac :include-macros true]
-   [rxcljs.core :as rc :refer [RxNext RxError] :include-macros true]
+   [rxcljs.core :as rc :refer [RxError] :include-macros true]
    [rxcljs.transformers :as rt :include-macros true]))
 
 (deftest promise?
@@ -24,7 +24,7 @@
                           %
                           (fn [val] {:type :resolve :val val})
                           (fn [val] {:type :reject :val val}))
-         ps [(resolve-result (rt/chan->promise (async/go (RxNext. 1))))
+         ps [(resolve-result (rt/chan->promise (async/go 1)))
              (resolve-result (rt/chan->promise (async/go (RxError. fake-error))))
              (resolve-result (rt/chan->promise (async/go (RxError. 2))))]
          final-promise (js/Promise.all (clj->js ps))]
@@ -48,7 +48,7 @@
             r2 (async/<! (rt/promise->chan (js/Promise.reject 2)))
             r3 (async/<! (rt/promise->chan (js/Promise.reject fake-error)))
             r4 (async/<! (rt/promise->chan (js/Promise.resolve nil)))]
-     (is (= (rc/RxNext. 1) r1))
+     (is (= 1 r1))
      (is (= (ex-data (rc/RxError. 2)) (ex-data r2)))
      (is (= (ex-data (rc/RxError. fake-error)) (ex-data r3)))
      (is (= nil r4))
@@ -70,8 +70,8 @@
                                                                 (.next observer 1)
                                                                 (.error observer fake-error)
                                                                 (.next observer 2))))))]
-     (is (= [(rc/rxnext 1) (rc/rxnext 2) (rc/rxnext 3)] r1))
-     (is (= [(rc/rxnext 1) (rc/rxerror fake-error)] r2))
+     (is (= [1 2 3] r1))
+     (is (= [1 (rc/rxerror fake-error)] r2))
      (done))))
 
 
@@ -256,11 +256,11 @@ callback(null, {
                chan3 1
                chan4 (go (go (throw fake-error)))
                chan5 (go (go fake-error))]
-     (is (= (rc/rxnext 1) (async/<! (rt/flat-chan chan1))))
-     (is (= (rc/rxnext 1) (async/<! (rt/flat-chan chan2))))
-     (is (= (rc/rxnext 1) (async/<! (rt/flat-chan chan3))))
+     (is (= 1 (async/<! (rt/flat-chan chan1))))
+     (is (= 1 (async/<! (rt/flat-chan chan2))))
+     (is (= 1 (async/<! (rt/flat-chan chan3))))
      (is (= (rc/rxerror fake-error) (async/<! (rt/flat-chan chan4))))
-     (is (= (rc/rxnext fake-error) (async/<! (rt/flat-chan chan5))))
+     (is (= fake-error (async/<! (rt/flat-chan chan5))))
      (done))))
 
 (deftest <<!

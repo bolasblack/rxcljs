@@ -13,7 +13,7 @@
               [rxcljs.transformers]])))
 
 (defn xfwrap
-  "wrap/unwrap RxNext and RxError for transducers automatically
+  "wrap/unwrap RxError for transducers automatically
 
   (let [[head tail] (xfwrap)]
      (apply comp head (concat xforms [tail])))"
@@ -27,15 +27,15 @@
           (if (rc/rxerror? input)
             (@reducer-ref result input)
             (try
-              (rf result (if (rc/rxnext? input) @input input))
+              (rf result (if (rc/rxval? input) @input input))
               (catch :default e
                 (@reducer-ref result (rc/rxerror e))))))))
      (fn [rf]
        (vreset! reducer-ref rf)
-       ((clojure.core/map rc/rxnext) rf))]))
+       rf)]))
 
 (defn xfcomp
-  "Drop-in replacement for comp, wrap/unwrap RxNext and RxError for transducers automatically"
+  "Drop-in replacement for comp, wrap RxError for transducers automatically"
   [& xforms]
   (let [[head tail] (xfwrap)]
     (apply comp head (concat xforms [tail]))))
@@ -48,8 +48,7 @@
   (go-let [chan (pipe (rt/from [1 2 3])
                   (filter odd?)
                   (map inc))]
-    (is (= 2 (<! chan)))
-    (is (= (rc/rxnext 4) (async/<! chan))))"
+    (is (= 2 (<! chan))))"
   [chan & xforms]
   (let [cloned-buf (rc/clone-buf (.-buf chan))
         cloned-chan (async/chan cloned-buf (apply xfcomp xforms))]
@@ -94,7 +93,10 @@
 ;; https://github.com/clojure/core.async/blob/83ca922f618fb8b1a3affe7ab8b6b62b80e083e8/src/main/clojure/cljs/core/async.cljs#L680
 ;; https://github.com/clojure/core.async/blob/83ca922f618fb8b1a3affe7ab8b6b62b80e083e8/src/main/clojure/clojure/core/async.clj#L918
 (defn map
-  "Like core.async/map, but support RxNext/RxError, and auto flat channels"
+  "Like core.async/map, but support RxError
+
+  Will park if f returns a channel, the first value of the returned
+  channel will be supplied to output channel."
   ([f chs] (map f chs nil))
   ([f chs buf-or-n]
    (let [chs (vec chs)
@@ -105,10 +107,7 @@
          dctr (atom nil)
          done (mapv (fn [i]
                       (fn [err ret]
-                        (aset rets i (cond
-                                       err (rc/rxerror err)
-                                       (nil? ret) ret
-                                       :else (rc/rxnext ret)))
+                        (aset rets i (if err (rc/rxerror err) ret))
                         (when (zero? (swap! dctr dec))
                           (rc/put!
                            dchan
@@ -122,7 +121,7 @@
          (try
            (async/take! (chs i) #(if (rc/rxerror? %)
                                    ((done i) (deref %))
-                                   ((done i) nil (rc/safely-unwrap-rxval %))))
+                                   ((done i) nil %)))
            (catch :default e
              ((done i) e))))
        (let [rets (<! dchan)]
@@ -130,10 +129,15 @@
            (some rc/rxerror? rets)
            (do (async/>! out (first (filter rc/rxerror? rets)))
                (rc/close! out))
-           
+
            (some nil? rets)
            (rc/close! out)
-           
-           :else (do (>! out (apply f (.map rets deref)))
-                     (recur)))))
+
+           :else (do
+                   (try
+                     (let [res (<<! (apply f rets))]
+                       (>! out res))
+                     (catch :default e
+                       (>! out (rc/rxerror e))))
+                   (recur)))))
      out)))

@@ -6,7 +6,7 @@
    [cljs.test :as ct :refer-macros [deftest testing is] :include-macros true]
    [cljs.core.async :as async]
    [cljs.core.async.impl.buffers :as asyncb]
-   [rxcljs.core :as rc :refer [RxNext RxError] :include-macros true]))
+   [rxcljs.core :as rc :refer [RxError] :include-macros true]))
 
 (defn -main [])
 
@@ -18,7 +18,7 @@
    done
    (rc/go-let [e (ex-info "foo" {})
                ch (async/chan)]
-     (is (= (rc/rxnext 1)
+     (is (= 1
             (async/<! (rc/go 1))))
      (is (= (rc/rxerror e)
             (async/<! (rc/go (throw e)))))

@@ -36,7 +36,7 @@
         promise
         (fn [val]
           (if val
-            (async/put! chan (rc/RxNext. val) (fn [] (close! chan)))
+            (async/put! chan val (fn [] (close! chan)))
             (close! chan)))
         #(async/put! chan (rc/RxError. %) (fn [] (close! chan))))
        chan)))
@@ -54,7 +54,7 @@
    (defn chan->observer
      "Transform `chan` to [`Observable`](https://rxjs-dev.firebaseapp.com/api/index/class/Observable)"
      [chan]
-     #js {:next #(async/put! chan (rc/RxNext. %))
+     #js {:next #(async/put! chan %)
           :error #(async/put! chan (rc/RxError. %) (fn [] (close! chan)))
           :complete #(close! chan)}))
 
@@ -131,7 +131,7 @@
                       callback (fn [err data]
                                  (if err
                                    (async/put! chan (rc/rxerror err) close-chan)
-                                   (async/put! chan (rc/rxnext data) close-chan)))
+                                   (async/put! chan data close-chan)))
                       final-args (concat args [callback])]
                   (.apply f receiver (into-array final-args))
                   chan))]
