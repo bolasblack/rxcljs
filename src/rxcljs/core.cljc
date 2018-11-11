@@ -1,7 +1,7 @@
 (ns rxcljs.core
   (:refer-clojure :exclude [update])
   #?(:cljs (:require-macros
-            [rxcljs.core :refer [go go-loop go-let handle-rxval >! <!]]))
+            [rxcljs.core :refer [go go-loop go-let handle-rxval >! <! <!!]]))
   (:require
    #?(:cljs [clojure.core.async.impl.buffers :refer [FixedBuffer DroppingBuffer SlidingBuffer]])
    [clojure.core.async.impl.protocols :as async-protocols]
@@ -42,31 +42,41 @@
 
 
 
+(defn chan? [a]
+  (satisfies? async-protocols/ReadPort a))
+
+
+
+
+(defn closed? [a]
+  (if (chan? a)
+    (async-protocols/closed? a)
+    true))
+
+
+
+
 #?(:clj
    (defmacro handle-rxval
-     ([bindings val-handler]
-      `(handle-rxval ~bindings ~val-handler nil nil))
-     ([bindings val-handler err-handler]
-      `(handle-rxval ~bindings ~val-handler ~err-handler nil))
-     ([bindings val-handler err-handler else-handler]
+     ([bindings err-cause]
+      `(handle-rxval ~bindings nil ~err-cause))
+     ([bindings val-cause err-cause]
       (ac/assert-args
        (vector? bindings) "a vector for its binding"
        (= 2 (count bindings)) "exactly 2 forms in binding vector")
       (let [[v-sym] bindings
-            err-cause (if err-handler err-handler val-handler)
-            else-cause (if else-handler else-handler v-sym)]
+            val-cause (or val-cause v-sym)]
         `(let ~bindings
-           (cond
-             (rxerror? ~v-sym) ~err-cause
-             (rxval? ~v-sym) ~val-handler
-             :else ~else-cause))))))
+           (if (rxerror? ~v-sym)
+             ~err-cause
+             ~val-cause))))))
 
 #_(macroexpand '(handle-rxval
                  [eval-expr (ac/if-cljs
                              (cljs.core.async/<! ~ch)
                              (clojure.core.async/<! ~ch))]
-                 (deref eval-expr)
-                 (throw (deref eval-expr))))
+                 @eval-expr
+                 (throw @eval-expr)))
 
 
 
@@ -96,16 +106,47 @@
        [eval-expr# (ac/if-cljs
                     (cljs.core.async/<! ~ch)
                     (clojure.core.async/<! ~ch))]
-       @eval-expr#
        (throw @eval-expr#))))
 
 #_(macroexpand-1 '(<! ch))
 
 #?(:clj
-   (defmacro >! [& args]
+   (defmacro >!
+     [port val]
      `(ac/if-cljs
-       (cljs.core.async/>! ~@args)
-       (clojure.core.async/>! ~@args))))
+       (cljs.core.async/>! ~port ~val)
+       (clojure.core.async/>! ~port ~val))))
+
+
+
+
+#?(:cljs
+   (defn <!!* [ch]
+     (let [env-warning "[rxcljs.core] <!! only supported in Node.js and require installed https://www.npmjs.com/package/deasync"
+           deasync (try
+                     (js/require "deasync")
+                     (catch js/ReferenceError err
+                       (throw (js/RuntimeError. env-warning))))
+           result-ref (volatile! {:done? false :value nil})]
+       (when (closed? ch) nil)
+       (cljs.core.async/take! ch #(vreset! result-ref {:done? true :value %}))
+       (.loopWhile deasync #(not (:done? @result-ref)))
+       (handle-rxval
+        [value (:value @result-ref)]
+        (throw @value)))))
+
+#?(:clj
+   (defmacro <!!
+     "takes a val from port. Will return nil if closed. Will block
+  if nothing is available.
+
+  Use [deasync](https://www.npmjs.com/package/deasync) to block
+  event loop in Node.js, and not supported in other JavaScript
+  runtime"
+     [port]
+     `(ac/if-cljs
+       (rxcljs.core/<!!* ~port)
+       (clojure.core.async/<!! ~port))))
 
 
 
@@ -129,20 +170,6 @@
 (def offer! "Alias of clojure.core.async/offer!" async/offer!)
 
 (def close! "Alias of clojure.core.async/close!" async/close!)
-
-
-
-
-(defn chan? [a]
-  (satisfies? async-protocols/ReadPort a))
-
-
-
-
-(defn closed? [a]
-  (if (chan? a)
-    (async-protocols/closed? a)
-    true))
 
 
 

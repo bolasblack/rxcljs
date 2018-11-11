@@ -23,9 +23,8 @@
       (fn [resolve reject]
         (go (handle-rxval
              [val (async/<! chan)]
-             (resolve @val)
-             (reject @val)
-             (resolve val)))))))
+             (resolve val)
+             (reject @val)))))))
 
 #?(:cljs
    (defn promise->chan

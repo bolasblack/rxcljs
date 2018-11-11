@@ -1,6 +1,6 @@
 (ns rxcljs.core-test
   (:require-macros
-   [rxcljs.core :refer [go <! >!]])
+   [rxcljs.core :refer [go <! <!! >!]])
   (:require
    [pjstadig.humane-test-output]
    [cljs.test :as ct :refer-macros [deftest testing is] :include-macros true]
@@ -56,19 +56,28 @@
 (defn read-both [ch-a ch-b]
   (rc/go-let [a (<! ch-a)
               b (<! ch-b)]
-    (is false)
     [a b]))
 
-(deftest <!-test-1
+(deftest <!-test
   (ct/async
    done
-   (rc/go-let [e (ex-info "foo" {})
-               ch-a (go (throw e))
-               ch-b (go 1)
-               res (async/<! (read-both ch-a ch-b))]
-     (is (= (rc/rxerror e) res))
+   (rc/go-let [e (ex-info "foo" {})]
+     (is (= [1 e] (async/<! (read-both (go 1) (go e)))))
+     (is (= [e 1] (async/<! (read-both (go e) (go 1)))))
+     (is (rc/rxerror e) (async/<! (read-both (go 1) (go (throw e)))))
+     (is (rc/rxerror e) (async/<! (read-both (go (throw e)) (go 1))))
      (done))))
 
+
+
+(deftest <!!-test
+  (let [e (ex-info "foo" {})]
+    (is (= 1 (<!! (go 1))))
+    (try
+      (<!! (go (throw e)))
+      (is false)
+      (catch :default err
+        (is (= e err))))))
 
 
 
