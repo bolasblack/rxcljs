@@ -2,7 +2,6 @@
   (:require-macros
    [rxcljs.core :refer [go go-let <! >!]])
   (:require
-   [pjstadig.humane-test-output]
    ["lodash.isequal" :as js-equal]
    ["rxjs" :as rx]
    [goog.object :as go]

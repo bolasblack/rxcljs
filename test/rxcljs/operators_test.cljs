@@ -2,7 +2,6 @@
   (:require-macros
    [rxcljs.core :refer [go go-let go-loop <! >!]])
   (:require
-   [pjstadig.humane-test-output]
    [cljs.test :as ct :refer-macros [deftest testing is are] :include-macros true]
    [cljs.core.async :as async]
    [rxcljs.core :as rc]
