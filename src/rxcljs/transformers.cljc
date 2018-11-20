@@ -100,14 +100,27 @@
   argument and calling that callback with error as the first
   argument and success value on the second argument.
 
-  If you pass a `receiver`, the `nodeFunction` will be called as a
-  method on the `receiver`.
+  Arguments:
+
+  * `f`: The function need be denodify.
+  * `receiver`: Optional, if you pass a `receiver`, the `f` will be called
+  as a method on the `receiver`. Default nil
+  * `options`: Optional
+      * `transformer`: Optional, can transform callback result. Default:
+          ```clojurescript
+          (fn [err data]
+            (cond err (rxerror err)
+                  (nil? data) :nil
+                  :else data))
+          ```
+
 
   ```clojurescript
-  (def read-file (denodify (.-readFile fs)))
+  (def read-file (denodify (.-readFile fs) fs))
+  (def accessable? (denodify (.-access fs) :transform (fn [err data] (nil? err))))
 
   (go (try
-        (let [content (<? (read-file \"myfile\" \"utf8\"))]
+        (let [content (<! (read-file \"myfile\" \"utf8\"))]
           (println \"The result of evaluating myfile.js\" (.toString content)))
         (catch :default err
           (prn 'Error reading file' err))))
@@ -124,16 +137,19 @@
      ([f]
       (denodify f nil))
      ([f receiver]
-      (letfn [(denodified-fn [& args]
-                (let [chan (async/chan)
-                      close-chan #(close! chan)
-                      callback (fn [err data]
-                                 (if err
-                                   (async/put! chan (rc/rxerror err) close-chan)
-                                   (async/put! chan data close-chan)))
-                      final-args (concat args [callback])]
-                  (.apply f receiver (into-array final-args))
-                  chan))]
+      (denodify f receiver nil))
+     ([f receiver & {:keys [transform]
+                     :or {transform (fn [err data]
+                                      (cond err (rc/rxerror err)
+                                            (nil? data) :nil
+                                            :else data))}}]
+      (let [denodified-fn (fn [& args]
+                            (let [chan (async/chan)
+                                  close-chan #(close! chan)
+                                  callback #(async/put! chan (apply transform %&) close-chan)
+                                  final-args (concat args [callback])]
+                              (.apply f receiver (into-array final-args))
+                              chan))]
         (try
           (js/Object.defineProperty denodified-fn "length" #js {:configurable true :value (dec f.length)})
           (let [new-name (if (s/blank? (.-name f)) "denodified_fn" (str "denodified_" (.-name f)))]
@@ -151,10 +167,10 @@
   (macroexpand-1 '(denodify.. redisClient -get \"foo\"))
   #=> ((denodify (.. redisClient -get) redisClient) \"foo\")
   ```"
-     [o & _path]
+     [o & rest]
      (let [[path args] (split-with #(and (symbol? %)
                                          (s/starts-with? (name %) "-"))
-                                   _path)]
+                                   rest)]
        (cond
          (empty? path)
          `((denodify ~o) ~@args)
@@ -173,8 +189,8 @@
   (macroexpand-1 '(<n! redisClient -get \"foo\"))
   #=> (<! (denodify.. redisClient -get \"foo\"))
   ```"
-     [& path]
-     `(<! (rxcljs.transformers/denodify.. ~@path))))
+     [& denodify-args]
+     `(<! (rxcljs.transformers/denodify.. ~@denodify-args))))
 
 #_(macroexpand-1 '(<n! obj -a -b "test path"))
 

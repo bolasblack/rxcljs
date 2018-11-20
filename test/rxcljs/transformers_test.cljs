@@ -6,7 +6,7 @@
    ["rxjs" :as rx]
    [goog.object :as go]
    [cljs.test :as ct :refer-macros [deftest testing is] :include-macros true]
-   [cljs.core.async :as async]
+   [cljs.core.async :as async :include-macros true]
    [adjutant.core :as ac :include-macros true]
    [rxcljs.core :as rc :refer [RxError] :include-macros true]
    [rxcljs.transformers :as rt :include-macros true]))
@@ -186,6 +186,28 @@ callback(null, {
       (do
         (is (ac/error? resp))
         (is (= fake-error resp)))]
+     (done))))
+
+(deftest denodify-option-transformer
+  (ct/async
+   done
+   (go-let [fake-error (js/Error. "fake error")
+            nodef-callback-args (volatile! [])
+            nodef (fn [callback] (apply callback @nodef-callback-args))
+            f1 (rt/denodify nodef)
+            f2 (rt/denodify nodef nil :transform #(nil? %1))]
+
+     (is (= :nil (async/<! (f1))))
+
+     (vreset! nodef-callback-args [fake-error])
+     (is (= (rc/rxerror fake-error) (async/<! (f1))))
+
+     (vreset! nodef-callback-args [fake-error])
+     (is (= false (async/<! (f2))))
+
+     (vreset! nodef-callback-args [])
+     (is (= true (async/<! (f2))))
+
      (done))))
 
 (deftest denodify..
