@@ -83,11 +83,10 @@
 
 #?(:clj
    (defmacro go [& body]
-     (let [wrapped-body
-           `(try
-              ~@body
-              (catch (ac/if-cljs :default Throwable) e#
-                (rxerror e#)))]
+     (let [catch-clause (if (:ns &env)  ; ClojureScript
+                          '(catch :default e# (rxcljs.core/rxerror e#))
+                          '(catch Throwable e# (rxcljs.core/rxerror e#)))
+           wrapped-body `(try ~@body ~catch-clause)]
        `(ac/if-cljs
          (cljs.core.async/go ~wrapped-body)
          (clojure.core.async/go ~wrapped-body)))))

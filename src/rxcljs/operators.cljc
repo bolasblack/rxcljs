@@ -111,9 +111,8 @@
                         (when (zero? (swap! dctr dec))
                           (rc/put!
                            dchan
-                           (if-cljs
-                            (.slice rets 0)
-                            (java.util.Arrays/copyOf rets cnt))))))
+                           #?(:cljs (.slice rets 0)
+                              :clj (java.util.Arrays/copyOf rets cnt))))))
                     (range cnt))]
      (go-loop []
        (reset! dctr cnt)

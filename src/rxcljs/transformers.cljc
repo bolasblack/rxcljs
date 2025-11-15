@@ -106,7 +106,7 @@
   * `receiver`: Optional, if you pass a `receiver`, the `f` will be called
   as a method on the `receiver`. Default nil
   * `options`: Optional
-      * `transformer`: Optional, can transform callback result. Default:
+      * `transform`: Optional, can transform callback result. Default:
           ```clojurescript
           (fn [err data]
             (cond err (rxerror err)
